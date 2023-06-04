@@ -114,7 +114,7 @@ var import_typescript_versions3 = require("@definitelytyped/typescript-versions"
 var import_fs_extra4 = require("fs-extra");
 var import_path5 = require("path");
 
-// src/utils.ts
+// src/install.ts
 var import_child_process = require("child_process");
 var fs = __toESM(require("fs-extra"));
 var os = __toESM(require("os"));
@@ -124,8 +124,10 @@ var import_typescript_versions = require("@definitelytyped/typescript-versions")
 var assert = require("assert");
 var installsDir = path.join(os.homedir(), ".dts", "typescript-installs");
 async function installAllTypeScriptVersions() {
-  console.log("TypeScriptVersion.shipped", import_typescript_versions.TypeScriptVersion.shipped);
-  for (const v of import_typescript_versions.TypeScriptVersion.shipped) {
+  const i = import_typescript_versions.TypeScriptVersion.shipped.indexOf("5.0");
+  const installs = i !== -1 ? import_typescript_versions.TypeScriptVersion.shipped.slice(i) : import_typescript_versions.TypeScriptVersion.shipped;
+  console.log("installing", installs, "...");
+  for (const v of installs) {
     await install(v);
   }
 }

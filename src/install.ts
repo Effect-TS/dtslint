@@ -11,8 +11,10 @@ type TsVersion = TypeScriptVersion | "local";
 const installsDir = path.join(os.homedir(), ".dts", "typescript-installs");
 
 export async function installAllTypeScriptVersions() {
-  console.log('TypeScriptVersion.shipped', TypeScriptVersion.shipped)
-  for (const v of TypeScriptVersion.shipped) {
+  const i = TypeScriptVersion.shipped.indexOf('5.0')
+  const installs = i !== -1 ? TypeScriptVersion.shipped.slice(i) : TypeScriptVersion.shipped
+  console.log('installing', installs, '...')
+  for (const v of installs) {
     await install(v);
   }
   // `shipped + [rc, next] == supported` during the RC period. During that time, typescript@rc needs to be installed too.

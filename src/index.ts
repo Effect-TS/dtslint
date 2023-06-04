@@ -6,7 +6,7 @@ import assert = require("assert");
 import { readdir, readFile, stat, existsSync } from "fs-extra";
 import { basename, dirname, join as joinPaths, resolve } from "path";
 
-import { cleanTypeScriptInstalls, installAllTypeScriptVersions, installTypeScriptNext } from "./utils";
+import { cleanTypeScriptInstalls, installAllTypeScriptVersions, installTypeScriptNext } from "./install";
 import { checkPackageJson, checkTsconfig } from "./checks";
 import { checkTslintJson, lint, TsVersion } from "./lint";
 import { getCompilerOptions, mapDefinedAsync, withoutPrefix } from "./util";
