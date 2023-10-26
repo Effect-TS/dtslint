@@ -1,309 +1,208 @@
 #!/usr/bin/env node
 
-import { parseTypeScriptVersionLine } from "@definitelytyped/header-parser";
-import { AllTypeScriptVersion, TypeScriptVersion } from "@definitelytyped/typescript-versions";
-import assert = require("assert");
-import { readdir, readFile, stat, existsSync } from "fs-extra";
-import { basename, dirname, join as joinPaths, resolve } from "path";
+import { exec } from "child_process"
+import * as fs from "fs-extra"
+import * as NodePath from "node:path"
+import * as os from "os"
+import { Configuration, Linter } from "tslint"
+import type TsType from "typescript"
+import type { Options as ExpectOptions } from "./expectRule"
 
-import { cleanTypeScriptInstalls, installAllTypeScriptVersions, installTypeScriptNext } from "./install";
-import { checkPackageJson, checkTsconfig } from "./checks";
-import { checkTslintJson, lint, TsVersion } from "./lint";
-import { getCompilerOptions, mapDefinedAsync, withoutPrefix } from "./util";
+namespace TypeScriptVersion {
+  /** Add to this list when a version actually ships.  */
+  export const shipped = [
+    "5.0",
+    "5.1",
+    "5.2"
+  ] as const
+  /** Add to this list when a version is available as typescript@next */
+  export const supported = [...shipped, "5.3"] as const
+
+  export const latest = supported[supported.length - 1]
+}
+
+type TypeScriptVersion = (typeof TypeScriptVersion.supported)[number]
+
+type Configuration = typeof Configuration
+type IConfigurationFile = Configuration.IConfigurationFile
+
+const installsDir = NodePath.join(os.homedir(), ".dts", "typescript-installs")
+
+main().catch((err) => {
+  console.error(err.stack)
+  process.exit(1)
+})
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
-  let dirPath = process.cwd();
-  let onlyTestTsNext = false;
-  let expectOnly = false;
-  let shouldListen = false;
-  let lookingForTsLocal = false;
-  let tsLocal: string | undefined;
-
-  console.log(`dtslint@${require("../package.json").version}`);
+  const args = process.argv.slice(2)
+  let dirPath = process.cwd()
 
   for (const arg of args) {
-    if (lookingForTsLocal) {
-      if (arg.startsWith("--")) {
-        throw new Error("Looking for local path for TS, but got " + arg);
-      }
-      tsLocal = resolve(arg);
-      lookingForTsLocal = false;
-      continue;
-    }
     switch (arg) {
       case "--installAll":
-        console.log("Cleaning old installs and installing for all TypeScript versions...");
-        console.log("Working...");
-        await cleanTypeScriptInstalls();
-        await installAllTypeScriptVersions();
-        return;
-      case "--localTs":
-        lookingForTsLocal = true;
-        break;
-      case "--version":
-        console.log(require("../package.json").version);
-        return;
-      case "--expectOnly":
-        expectOnly = true;
-        break;
-      case "--onlyTestTsNext":
-        onlyTestTsNext = true;
-        break;
-      // Only for use by types-publisher.
-      // Listens for { path, onlyTestTsNext } messages and outputs { path, status }.
-      case "--listen":
-        shouldListen = true;
-        break;
+        console.log("Cleaning old installs and installing for all TypeScript versions...")
+        await cleanTypeScriptInstalls()
+        await installAllTypeScriptVersions()
+        return
       default: {
         if (arg.startsWith("--")) {
-          console.error(`Unknown option '${arg}'`);
-          usage();
-          process.exit(1);
+          console.error(`Unknown option '${arg}'`)
+          process.exit(1)
         }
 
-        const path =
-          arg.indexOf("@") === 0 && arg.indexOf("/") !== -1
-            ? // we have a scoped module, e.g. @bla/foo
-              // which should be converted to   bla__foo
-              arg.slice(1).replace("/", "__")
-            : arg;
-        dirPath = joinPaths(dirPath, path);
+        const path = arg
+        dirPath = NodePath.join(dirPath, path)
       }
     }
   }
-  if (lookingForTsLocal) {
-    throw new Error("Path for --localTs was not provided.");
-  }
 
-  if (shouldListen) {
-    listen(dirPath, tsLocal, onlyTestTsNext);
-  } else {
-    await installTypeScriptAsNeeded(tsLocal, onlyTestTsNext);
-    await runTests(dirPath, onlyTestTsNext, expectOnly, tsLocal);
-  }
-}
-
-async function installTypeScriptAsNeeded(tsLocal: string | undefined, onlyTestTsNext: boolean): Promise<void> {
-  if (tsLocal) return;
-  if (onlyTestTsNext) {
-    return installTypeScriptNext();
-  }
-  return installAllTypeScriptVersions();
-}
-
-function usage(): void {
-  console.error("Usage: dtslint [--version] [--installAll] [--onlyTestTsNext] [--expectOnly] [--localTs path]");
-  console.error("Args:");
-  console.error("  --version        Print version and exit.");
-  console.error("  --installAll     Cleans and installs all TypeScript versions.");
-  console.error("  --expectOnly     Run only the ExpectType lint rule.");
-  console.error("  --onlyTestTsNext Only run with `typescript@next`, not with the minimum version.");
-  console.error("  --localTs path   Run with *path* as the latest version of TS.");
-  console.error("");
-  console.error("onlyTestTsNext and localTs are (1) mutually exclusive and (2) test a single version of TS");
-}
-
-function listen(dirPath: string, tsLocal: string | undefined, alwaysOnlyTestTsNext: boolean): void {
-  // Don't await this here to ensure that messages sent during installation aren't dropped.
-  const installationPromise = installTypeScriptAsNeeded(tsLocal, alwaysOnlyTestTsNext);
-  process.on("message", async (message: unknown) => {
-    const { path, onlyTestTsNext, expectOnly } = message as {
-      path: string;
-      onlyTestTsNext: boolean;
-      expectOnly?: boolean;
-    };
-
-    await installationPromise;
-    runTests(joinPaths(dirPath, path), onlyTestTsNext, !!expectOnly, tsLocal)
-      .catch((e) => e.stack)
-      .then((maybeError) => {
-        process.send!({ path, status: maybeError === undefined ? "OK" : maybeError });
-      })
-      .catch((e) => console.error(e.stack));
-  });
-}
-
-async function runTests(
-  dirPath: string,
-  onlyTestTsNext: boolean,
-  expectOnly: boolean,
-  tsLocal: string | undefined
-): Promise<void> {
-  const isOlderVersion = /^v(0\.)?\d+$/.test(basename(dirPath));
-
-  const indexText = await readFile(joinPaths(dirPath, "index.d.ts"), "utf-8");
-  // If this *is* on DefinitelyTyped, types-publisher will fail if it can't parse the header.
-  const dt = indexText.includes("// Type definitions for");
-  if (dt) {
-    // Someone may have copied text from DefinitelyTyped to their type definition and included a header,
-    // so assert that we're really on DefinitelyTyped.
-    const dtRoot = findDTRoot(dirPath);
-    const packageName = basename(dirPath);
-    assertPathIsInDefinitelyTyped(dirPath, dtRoot);
-    assertPathIsNotBanned(packageName);
-    assertPackageIsNotDeprecated(packageName, await readFile(joinPaths(dtRoot, "notNeededPackages.json"), "utf-8"));
-  }
-
-  const typesVersions = await mapDefinedAsync(await readdir(dirPath), async (name) => {
-    if (name === "tsconfig.json" || name === "tslint.json" || name === "tsutils") {
-      return undefined;
-    }
-    const version = withoutPrefix(name, "ts");
-    if (version === undefined || !(await stat(joinPaths(dirPath, name))).isDirectory()) {
-      return undefined;
-    }
-
-    if (!TypeScriptVersion.isTypeScriptVersion(version)) {
-      throw new Error(`There is an entry named ${name}, but ${version} is not a valid TypeScript version.`);
-    }
-    if (!TypeScriptVersion.isRedirectable(version)) {
-      throw new Error(`At ${dirPath}/${name}: TypeScript version directories only available starting with ts3.1.`);
-    }
-    return version;
-  });
-
-  if (dt) {
-    await checkPackageJson(dirPath, typesVersions);
-  }
-
-  const minVersion = maxVersion(
-    getMinimumTypeScriptVersionFromComment(indexText),
-    TypeScriptVersion.lowest
-  ) as TypeScriptVersion;
-  if (onlyTestTsNext || tsLocal) {
-    const tsVersion = tsLocal ? "local" : TypeScriptVersion.latest;
-    await testTypesVersion(dirPath, tsVersion, tsVersion, isOlderVersion, dt, expectOnly, tsLocal, /*isLatest*/ true);
-  } else {
-    // For example, typesVersions of [3.2, 3.5, 3.6] will have
-    // associated ts3.2, ts3.5, ts3.6 directories, for
-    // <=3.2, <=3.5, <=3.6 respectively; the root level is for 3.7 and above.
-    // so this code needs to generate ranges [lowest-3.2, 3.3-3.5, 3.6-3.6, 3.7-latest]
-    const lows = [TypeScriptVersion.lowest, ...typesVersions.map(next)];
-    const his = [...typesVersions, TypeScriptVersion.latest];
-    assert.strictEqual(lows.length, his.length);
-    for (let i = 0; i < lows.length; i++) {
-      const low = maxVersion(minVersion, lows[i]);
-      const hi = his[i];
-      assert(
-        parseFloat(hi) >= parseFloat(low),
-        `'// Minimum TypeScript Version: ${minVersion}' in header skips ts${hi} folder.`
-      );
-      const isLatest = hi === TypeScriptVersion.latest;
-      const versionPath = isLatest ? dirPath : joinPaths(dirPath, `ts${hi}`);
-      if (lows.length > 1) {
-        console.log("testing from", low, "to", hi, "in", versionPath);
-      }
-      await testTypesVersion(versionPath, low, hi, isOlderVersion, dt, expectOnly, undefined, isLatest);
-    }
-  }
-}
-
-function maxVersion(v1: TypeScriptVersion | undefined, v2: TypeScriptVersion): TypeScriptVersion;
-function maxVersion(v1: AllTypeScriptVersion | undefined, v2: AllTypeScriptVersion): AllTypeScriptVersion;
-function maxVersion(v1: AllTypeScriptVersion | undefined, v2: AllTypeScriptVersion) {
-  if (!v1) return v2;
-  if (!v2) return v1;
-  if (parseFloat(v1) >= parseFloat(v2)) return v1;
-  return v2;
-}
-
-function next(v: TypeScriptVersion): TypeScriptVersion {
-  const index = TypeScriptVersion.supported.indexOf(v);
-  assert.notStrictEqual(index, -1);
-  assert(index < TypeScriptVersion.supported.length);
-  return TypeScriptVersion.supported[index + 1];
-}
-
-async function testTypesVersion(
-  dirPath: string,
-  lowVersion: TsVersion,
-  hiVersion: TsVersion,
-  isOlderVersion: boolean,
-  dt: boolean,
-  expectOnly: boolean,
-  tsLocal: string | undefined,
-  isLatest: boolean
-): Promise<void> {
-  await checkTslintJson(dirPath, dt);
-  checkTsconfig(
-    await getCompilerOptions(dirPath),
-    dt ? { relativeBaseUrl: ".." + (isOlderVersion ? "/.." : "") + (isLatest ? "" : "/..") + "/" } : undefined
-  );
-  const err = await lint(dirPath, lowVersion, hiVersion, isLatest, expectOnly, tsLocal);
+  await installAllTypeScriptVersions()
+  const err = lint(dirPath, TypeScriptVersion.supported)
   if (err) {
-    throw new Error(err);
+    throw new Error(err)
   }
 }
 
-function findDTRoot(dirPath: string) {
-  let path = dirPath;
-  while (basename(path) !== "types" && dirname(path) !== "." && dirname(path) !== "/") {
-    path = dirname(path);
+function lint(
+  dirPath: string,
+  versions: ReadonlyArray<TypeScriptVersion>
+) {
+  const tsconfigPath = NodePath.join(dirPath, "tsconfig.json")
+  const lintProgram = Linter.createProgram(tsconfigPath)
+  const linter = new Linter({ fix: false, formatter: "stylish" }, lintProgram)
+  const config = getLintConfig(tsconfigPath, versions)
+  for (const file of lintProgram.getSourceFiles()) {
+    // External dependencies should have been handled by `testDependencies`;
+    if (!isExternalDependency(file, dirPath, lintProgram)) {
+      const { fileName, text } = file
+      console.log(`[INFO] linting ${NodePath.basename(fileName)}...`)
+      linter.lint(fileName, text, config)
+    }
   }
-  return dirname(path);
+  const result = linter.getResult()
+  const output = result.failures.length ? result.output : ""
+  return output
 }
 
-function assertPathIsInDefinitelyTyped(dirPath: string, dtRoot: string): void {
-  // TODO: It's not clear whether this assertion makes sense, and it's broken on Azure Pipelines (perhaps because DT isn't cloned into DefinitelyTyped)
-  // Re-enable it later if it makes sense.
-  // if (basename(dtRoot) !== "DefinitelyTyped")) {
-  if (!existsSync(joinPaths(dtRoot, "types"))) {
-    throw new Error(
-      "Since this type definition includes a header (a comment starting with `// Type definitions for`), " +
-        "assumed this was a DefinitelyTyped package.\n" +
-        "But it is not in a `DefinitelyTyped/types/xxx` directory: " +
-        dirPath
-    );
+function isExternalDependency(
+  file: TsType.SourceFile,
+  dirPath: string,
+  program: TsType.Program
+): boolean {
+  return !startsWithDirectory(file.fileName, dirPath) ||
+    program.isSourceFileFromExternalLibrary(file)
+}
+
+function startsWithDirectory(filePath: string, dirPath: string): boolean {
+  const normalFilePath = normalizePath(filePath)
+  const normalDirPath = normalizePath(dirPath).replace(/\/$/, "")
+  return normalFilePath.startsWith(normalDirPath + "/") ||
+    normalFilePath.startsWith(normalDirPath + "\\")
+}
+
+function normalizePath(file: string) {
+  // replaces '\' with '/' and forces all DOS drive letters to be upper-case
+  return NodePath.normalize(file)
+    .replace(/\\/g, "/")
+    .replace(/^[a-z](?=:)/, (c) => c.toUpperCase())
+}
+
+function getLintConfig(
+  tsconfigPath: string,
+  versions: ReadonlyArray<TypeScriptVersion>
+): IConfigurationFile {
+  const configPath = NodePath.join(__dirname, "dtslint.json")
+  // Second param to `findConfiguration` doesn't matter, since config path is provided.
+  const config = Configuration.findConfiguration(configPath, "").results
+  if (!config) {
+    throw new Error(`Could not load config at ${configPath}`)
+  }
+
+  const expectRule = config.rules.get("expect")
+  if (!expectRule) {
+    throw new Error("'expect' rule should be enabled, else compile errors are ignored")
+  }
+  const versionsToTest = versions.map((versionName) => ({
+    versionName,
+    path: typeScriptPath(versionName)
+  }))
+  const expectOptions: ExpectOptions = { tsconfigPath, versionsToTest }
+  expectRule.ruleArguments = [expectOptions]
+  return config
+}
+
+function typeScriptPath(
+  version: TypeScriptVersion | "next" | "rc"
+): string {
+  return NodePath.join(installDir(version), "node_modules", "typescript")
+}
+
+function installDir(version: TypeScriptVersion | "next" | "rc"): string {
+  if (version === "next") version = TypeScriptVersion.latest
+  if (version === "rc") {
+    version = TypeScriptVersion.supported[TypeScriptVersion.supported.length - 2]
+  }
+  return NodePath.join(installsDir, version)
+}
+
+function cleanTypeScriptInstalls(): Promise<void> {
+  return fs.remove(installsDir)
+}
+
+async function install(version: TypeScriptVersion | "next" | "rc"): Promise<void> {
+  const dir = installDir(version)
+  if (!(await fs.pathExists(dir))) {
+    console.log(`Installing to ${dir}...`)
+    await fs.mkdirp(dir)
+    await fs.writeJson(NodePath.join(dir, "package.json"), {
+      description: `Installs typescript@${version}`,
+      repository: "N/A",
+      license: "MIT",
+      dependencies: {
+        typescript: version
+      }
+    })
+    await execAndThrowErrors(
+      "npm install --ignore-scripts --no-shrinkwrap --no-package-lock --no-bin-links",
+      dir
+    )
+    console.log("Installed!")
   }
 }
 
-/**
- * Starting at some point in time, npm has banned all new packages whose names
- * contain the word `download`. However, some older packages exist that still
- * contain this name.
- * @NOTE for contributors: The list of literal exceptions below should ONLY be
- * extended with packages for which there already exists a corresponding type
- * definition package in the `@types` scope. More information:
- * https://github.com/microsoft/DefinitelyTyped-tools/pull/381.
- */
-function assertPathIsNotBanned(packageName: string) {
-  if (
-    /(^|\W)download($|\W)/.test(packageName) &&
-    packageName !== "download" &&
-    packageName !== "downloadjs" &&
-    packageName !== "s3-download-stream"
-  ) {
-    // Since npm won't release their banned-words list, we'll have to manually add to this list.
-    throw new Error(`${packageName}: Contains the word 'download', which is banned by npm.`);
-  }
+/** Run a command and return the stdout, or if there was an error, throw. */
+async function execAndThrowErrors(cmd: string, cwd?: string): Promise<void> {
+  // tslint:disable-next-line:promise-must-complete
+  return new Promise<void>((resolve, reject) => {
+    const env = { ...process.env }
+    if (env.NODE_OPTIONS && env.NODE_OPTIONS.includes("--require")) {
+      delete env.NODE_OPTIONS
+    }
+    exec(cmd, { encoding: "utf8", cwd, env }, (err, _stdout, stderr) => {
+      if (stderr) {
+        console.error(stderr)
+      }
+
+      if (err) {
+        reject(err)
+      } else {
+        resolve()
+      }
+    })
+  })
 }
 
-export function assertPackageIsNotDeprecated(packageName: string, notNeededPackages: string) {
-  const unneeded = JSON.parse(notNeededPackages).packages;
-  if (Object.keys(unneeded).includes(packageName)) {
-    throw new Error(`${packageName}: notNeededPackages.json has an entry for ${packageName}.
-That means ${packageName} ships its own types, and @types/${packageName} was deprecated and removed from Definitely Typed.
-If you want to re-add @types/${packageName}, please remove its entry from notNeededPackages.json.`);
+async function installAllTypeScriptVersions() {
+  for (const v of TypeScriptVersion.shipped) {
+    await install(v)
   }
+  // `shipped + [rc, next] == supported` during the RC period. During that time, typescript@rc needs to be installed too.
+  if (TypeScriptVersion.shipped.length + 2 === TypeScriptVersion.supported.length) {
+    await install("rc")
+  }
+  await installTypeScriptNext()
 }
 
-function getMinimumTypeScriptVersionFromComment(text: string): AllTypeScriptVersion | undefined {
-  const match = text.match(/\/\/ (?:Minimum )?TypeScript Version: /);
-  if (!match) {
-    return undefined;
-  }
-
-  let line = text.slice(match.index, text.indexOf("\n", match.index));
-  if (line.endsWith("\r")) {
-    line = line.slice(0, line.length - 1);
-  }
-  return parseTypeScriptVersionLine(line);
-}
-
-if (!module.parent) {
-  main().catch((err) => {
-    console.error(err.stack);
-    process.exit(1);
-  });
+export async function installTypeScriptNext() {
+  await install("next")
 }

@@ -1,9 +1,7 @@
 /**
  * @since 0.9.0
  */
-import * as Either from "@effect/data/Either"
-import { pipe } from "@effect/data/Function"
-import * as Effect from "@effect/io/Effect"
+import { Effect, Either, pipe } from "effect"
 import * as fs from "fs-extra"
 
 /**
@@ -54,8 +52,11 @@ export const readFile = (path: string): Effect.Effect<never, Error, string> =>
 export const readJsonFile = (path: string): Effect.Effect<never, Error, unknown> =>
   pipe(
     readFile(path),
-    Effect.flatMap(
-      Either.liftThrowable(JSON.parse, (e) => e instanceof Error ? e : new Error(String(e)))
+    Effect.flatMap((content) =>
+      Either.try({
+        try: () => JSON.parse(content),
+        catch: (e) => e instanceof Error ? e : new Error(String(e))
+      })
     )
   )
 
@@ -73,4 +74,3 @@ export const writeFile = (
       }
     })
   )
-

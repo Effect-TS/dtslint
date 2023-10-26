@@ -1,6 +1,4 @@
-import { pipe } from "@effect/data/Function"
-import * as ReadonlyRecord from "@effect/data/ReadonlyRecord"
-import * as Effect from "@effect/io/Effect"
+import { Effect, pipe, ReadonlyRecord } from "effect"
 import * as path from "node:path"
 import * as FileSystem from "./FileSystem"
 
