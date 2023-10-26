@@ -16,7 +16,8 @@
     "copy-package-json": "ts-node scripts/copy-package-json.ts",
     "dtslint": "node dist/index.js dtslint",
     "dtslint-clean": "node dist/index.js dtslint --installAll",
-    "docgen": "echo 'No docs'"
+    "docgen": "echo 'No docs'",
+    "docs-update": "echo 'No docs'"
   },
   "repository": {
     "type": "git",
