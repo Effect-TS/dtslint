@@ -1,0 +1,59 @@
+{
+  "name": "@effect/dtslint",
+  "version": "0.0.0",
+  "publishConfig": {
+    "access": "public",
+    "directory": "dist"
+  },
+  "description": "Effect's custom fork of dtslint used to lint TypeScript declaration (.d.ts) files",
+  "scripts": {
+    "version": "changeset version && pnpm install --no-frozen-lockfile && pnpm run docs-update",
+    "release": "pnpm run build && changeset publish",
+    "test": "echo 'No tests to run'",
+    "build": "tsc && pnpm copy-package-json",
+    "lint": "eslint . --ext .ts,.tsx",
+    "autofix": "pnpm lint --fix",
+    "copy-package-json": "ts-node scripts/copy-package-json.ts",
+    "dtslint": "node dist/index.js dtslint",
+    "dtslint-clean": "node dist/index.js dtslint --installAll",
+    "docgen": "echo 'No docs'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/effect-ts/dtslint.git"
+  },
+  "author": "Giulio Canti <giulio.canti@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/effect-ts/dtslint/issues"
+  },
+  "homepage": "https://github.com/effect-ts/dtslint",
+  "dependencies": {
+    "fs-extra": "11.1.1",
+    "tslint": "6.1.3"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^0.4.8",
+    "@changesets/cli": "^2.26.1",
+    "@effect/eslint-plugin": "^0.1.2",
+    "@effect/language-service": "^0.0.21",
+    "@types/fs-extra": "^11.0.3",
+    "@typescript-eslint/eslint-plugin": "^6.9.0",
+    "@typescript-eslint/parser": "^6.9.0",
+    "effect": "2.0.0-next.52",
+    "eslint": "^8.52.0",
+    "eslint-import-resolver-typescript": "^3.6.1",
+    "eslint-plugin-codegen": "0.17.0",
+    "eslint-plugin-deprecation": "^2.0.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-simple-import-sort": "^10.0.0",
+    "eslint-plugin-sort-destructure-keys": "^1.5.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4"
+  },
+  "peerDependencies": {
+    "typescript": "^5.x"
+  },
+  "tags": [],
+  "keywords": []
+}

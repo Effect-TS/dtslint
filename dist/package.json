@@ -1,0 +1,26 @@
+{
+  "name": "@effect/dtslint",
+  "version": "0.0.0",
+  "description": "Effect's custom fork of dtslint used to lint TypeScript declaration (.d.ts) files",
+  "main": "index.js",
+  "bin": "index.js",
+  "dependencies": {
+    "fs-extra": "11.1.1",
+    "tslint": "6.1.3"
+  },
+  "peerDependencies": {
+    "typescript": "^5.x"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/effect-ts/dtslint.git"
+  },
+  "author": "Giulio Canti <giulio.canti@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/effect-ts/dtslint/issues"
+  },
+  "homepage": "https://github.com/effect-ts/dtslint",
+  "tags": [],
+  "keywords": []
+}
