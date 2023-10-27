@@ -1,5 +1,11 @@
 # @effect/dtslint
 
+## 0.0.3
+
+### Patch Changes
+
+- 2ea3e35: do not lint version 5.0 twice
+
 ## 0.0.2
 
 ### Patch Changes
