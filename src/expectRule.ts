@@ -97,7 +97,7 @@ export class Rule extends Lint.Rules.TypedRule {
 
     // There are no failures in the max version, but there are failures in the min version.
     // Work backward to find the newest version with failures.
-    for (let i = versionsToTest.length - 2; i >= 0; i--) {
+    for (let i = versionsToTest.length - 2; i > 0; i--) {
       const failures = getFailures(
         versionsToTest[i],
         options.versionsToTest[i + 1].versionName,
