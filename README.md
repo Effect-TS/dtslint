@@ -1,3 +1,8 @@
+# Disclaimer
+
+> [!WARNING]
+> This tool is not intended for public consumption, so we may break the API whenever convenient for us.
+
 # Setting up the Environment
 
 To get started with `dtslint`, follow these steps to set up your development environment:
