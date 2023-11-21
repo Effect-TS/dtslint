@@ -13,10 +13,11 @@ namespace TypeScriptVersion {
   export const shipped = [
     "5.0",
     "5.1",
-    "5.2"
+    "5.2",
+    "5.3"
   ] as const
   /** Add to this list when a version is available as typescript@next */
-  export const supported = [...shipped, "5.3"] as const
+  export const supported = [...shipped, "5.4"] as const
 
   export const latest = supported[supported.length - 1]
 }
