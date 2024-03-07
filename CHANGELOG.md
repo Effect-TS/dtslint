@@ -1,5 +1,11 @@
 # @effect/dtslint
 
+## 0.0.5
+
+### Patch Changes
+
+- fe128b1: add typescript 5.4
+
 ## 0.0.4
 
 ### Patch Changes
