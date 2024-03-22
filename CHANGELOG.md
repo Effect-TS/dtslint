@@ -1,5 +1,11 @@
 # @effect/dtslint
 
+## 0.1.0
+
+### Minor Changes
+
+- f0c0876: Bumped TypeScript min requirement to version 5.4
+
 ## 0.0.5
 
 ### Patch Changes
