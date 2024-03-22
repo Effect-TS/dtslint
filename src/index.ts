@@ -11,10 +11,6 @@ import type { Options as ExpectOptions } from "./expectRule"
 namespace TypeScriptVersion {
   /** Add to this list when a version actually ships.  */
   export const shipped = [
-    "5.0",
-    "5.1",
-    "5.2",
-    "5.3",
     "5.4"
   ] as const
   /** Add to this list when a version is available as typescript@next */
