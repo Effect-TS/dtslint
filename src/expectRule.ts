@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
-import * as os from "os"
-import { basename, dirname, join, resolve as resolvePath } from "path"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import * as os from "node:os"
+import { basename, dirname, join, resolve as resolvePath } from "node:path"
 import * as Lint from "tslint"
-import TsType from "typescript"
+import * as TsType from "typescript"
 
 type Program = TsType.Program
 type SourceFile = TsType.SourceFile
@@ -28,7 +28,6 @@ export class Rule extends Lint.Rules.TypedRule {
     "Can not match a node to this assertion. If this is a multiline function call, ensure the assertion is on the line above."
 
   // TODO: If this naming convention is required by tslint, dump it when switching to eslint
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   static FAILURE_STRING(expectedVersion: string, expectedType: string, actualType: string): string {
     return `TypeScript@${expectedVersion} expected type to be:\n  ${expectedType}\ngot:\n  ${actualType}`
   }
@@ -50,7 +49,8 @@ export class Rule extends Lint.Rules.TypedRule {
       writeOutput: boolean
     ) => {
       console.log(`[INFO] └─ version ${versionName}`)
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const ts = require(path)
       ts.performance.enable()
       const program = getProgram(tsconfigPath, ts, versionName, lintProgram)
@@ -293,8 +293,7 @@ function walk(
     if (nextHigherVersion === undefined) {
       return `TypeScript@${versionName} compile error: `
     } else {
-      const msg =
-        `Compile error in typescript@${versionName} but not in typescript@${nextHigherVersion}.\n`
+      const msg = `Compile error in typescript@${versionName} but not in typescript@${nextHigherVersion}.\n`
       const explain = nextHigherVersion === "next"
         ? "TypeScript@next features not yet supported."
         : `Fix with a comment '// Minimum TypeScript Version: ${nextHigherVersion}' just under the header.`
@@ -328,7 +327,6 @@ function parseAssertions(sourceFile: SourceFile): Assertions {
   const lineStarts = sourceFile.getLineStarts()
   let curLine = 0
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const commentMatch = commentRegexp.exec(text)
     if (commentMatch === null) {

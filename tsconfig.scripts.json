@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": ["scripts"],
+  "compilerOptions": {
+    "tsBuildInfoFile": ".tsbuildinfo/scripts.tsbuildinfo",
+    "rootDir": ".",
+    "noEmit": true
+  }
+}

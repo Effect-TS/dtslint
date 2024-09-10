@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "outDir": "dist",
+    "stripInternal": true,
+    "types": ["node"],
+    "tsBuildInfoFile": ".tsbuildinfo/build.tsbuildinfo"
+  },
+  "include": ["src"]
+}

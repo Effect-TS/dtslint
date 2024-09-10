@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-import { exec } from "child_process"
 import * as fs from "fs-extra"
+import { exec } from "node:child_process"
+import * as os from "node:os"
 import * as NodePath from "node:path"
-import * as os from "os"
 import { Configuration, Linter } from "tslint"
-import type TsType from "typescript"
-import type { Options as ExpectOptions } from "./expectRule"
+import type * as TsType from "typescript"
+import type { Options as ExpectOptions } from "./expectRule.js"
 
 namespace TypeScriptVersion {
   /** Add to this list when a version actually ships.  */
