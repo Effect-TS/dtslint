@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-import { exec } from "child_process"
 import * as fs from "fs-extra"
+import { exec } from "node:child_process"
+import * as os from "node:os"
 import * as NodePath from "node:path"
-import * as os from "os"
 import { Configuration, Linter } from "tslint"
-import type TsType from "typescript"
-import type { Options as ExpectOptions } from "./expectRule"
+import type * as TsType from "typescript"
+import type { Options as ExpectOptions } from "./expectRule.js"
 
 namespace TypeScriptVersion {
   /** Add to this list when a version actually ships.  */
@@ -15,13 +15,9 @@ namespace TypeScriptVersion {
     "5.5",
     "5.6"
   ] as const
-  /** Add to this list when a version is available as typescript@next */
-  export const supported = [...shipped, "5.7"] as const
-
-  export const latest = supported[supported.length - 1]
 }
 
-type TypeScriptVersion = (typeof TypeScriptVersion.supported)[number]
+type TypeScriptVersion = (typeof TypeScriptVersion.shipped)[number]
 
 type Configuration = typeof Configuration
 type IConfigurationFile = Configuration.IConfigurationFile
@@ -39,11 +35,6 @@ async function main(): Promise<void> {
 
   for (const arg of args) {
     switch (arg) {
-      case "--installAll":
-        console.log("Cleaning old installs and installing for all TypeScript versions...")
-        await cleanTypeScriptInstalls()
-        await installTypeScriptVersions("all")
-        return
       case "--clean":
         console.log("Cleaning old installs...")
         await cleanTypeScriptInstalls()
@@ -60,8 +51,8 @@ async function main(): Promise<void> {
     }
   }
 
-  await installTypeScriptVersions("shipped")
-  const err = lint(dirPath, TypeScriptVersion.supported)
+  await installTypeScriptVersions()
+  const err = lint(dirPath, TypeScriptVersion.shipped)
   if (err) {
     throw new Error(err)
   }
@@ -136,16 +127,12 @@ function getLintConfig(
 }
 
 function typeScriptPath(
-  version: TypeScriptVersion | "next" | "rc"
+  version: TypeScriptVersion
 ): string {
   return NodePath.join(installDir(version), "node_modules", "typescript")
 }
 
-function installDir(version: TypeScriptVersion | "next" | "rc"): string {
-  if (version === "next") version = TypeScriptVersion.latest
-  if (version === "rc") {
-    version = TypeScriptVersion.supported[TypeScriptVersion.supported.length - 2]
-  }
+function installDir(version: TypeScriptVersion): string {
   return NodePath.join(installsDir, version)
 }
 
@@ -153,7 +140,7 @@ function cleanTypeScriptInstalls(): Promise<void> {
   return fs.remove(installsDir)
 }
 
-async function install(version: TypeScriptVersion | "next" | "rc"): Promise<void> {
+async function install(version: TypeScriptVersion): Promise<void> {
   const dir = installDir(version)
   if (!(await fs.pathExists(dir))) {
     console.log(`Installing to ${dir}...`)
@@ -196,17 +183,8 @@ async function execAndThrowErrors(cmd: string, cwd?: string): Promise<void> {
   })
 }
 
-async function installTypeScriptVersions(mode: "all" | "shipped") {
+async function installTypeScriptVersions() {
   for (const version of TypeScriptVersion.shipped) {
     await install(version)
-  }
-  if (mode === "all") {
-    // `shipped + [rc, next] == supported` during the RC period. During that time, typescript@rc needs to be installed too.
-    if (TypeScriptVersion.supported.length === TypeScriptVersion.shipped.length + 2) {
-      await install("rc")
-    }
-    if (TypeScriptVersion.supported.length >= TypeScriptVersion.shipped.length + 1) {
-      await install("next")
-    }
   }
 }

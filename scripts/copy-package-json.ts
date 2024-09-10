@@ -1,38 +1,34 @@
-import { Console, Effect, identity } from "effect"
-import * as path from "node:path"
-import * as FileSystem from "./FileSystem"
+import { FileSystem, Path } from "@effect/platform"
+import { NodeContext } from "@effect/platform-node"
+import { Effect } from "effect"
 
-const moveJson = (from: string, to: string, modify: (json: any) => any) =>
-  Console.log(`moving ${from} to ${to}`).pipe(
-    Effect.flatMap(() => FileSystem.readJsonFile(from)),
-    Effect.map(modify),
-    Effect.flatMap((json) => FileSystem.writeFile(to, JSON.stringify(json, null, 2)))
-  )
+const program = Effect.gen(function*() {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  yield* Effect.log("[Build] Copying package.json ...")
+  const json: any = yield* fs.readFileString("package.json").pipe(Effect.map(JSON.parse))
+  const pkg = {
+    name: json.name,
+    version: json.version,
+    type: json.type,
+    description: json.description,
+    main: "bin.js",
+    bin: "bin.js",
+    engines: json.engines,
+    dependencies: json.dependencies,
+    peerDependencies: json.peerDependencies,
+    repository: json.repository,
+    author: json.author,
+    license: json.license,
+    bugs: json.bugs,
+    homepage: json.homepage,
+    tags: json.tags,
+    keywords: json.keywords
+  }
+  yield* fs.writeFileString(path.join("dist", "package.json"), JSON.stringify(pkg, null, 2))
+  yield* Effect.log("[Build] Copying dtslint.json ...")
+  yield* fs.copyFile(path.join("src", "dtslint.json"), path.join("dist/dtslint.json"))
+  yield* Effect.log("[Build] Build completed.")
+}).pipe(Effect.provide(NodeContext.layer))
 
-const packageJson = moveJson("package.json", path.join("dist", "package.json"), (json: any) => ({
-  name: json.name,
-  version: json.version,
-  description: json.description,
-  main: "index.js",
-  bin: "index.js",
-  engines: json.engines,
-  dependencies: json.dependencies,
-  peerDependencies: json.peerDependencies,
-  repository: json.repository,
-  author: json.author,
-  license: json.license,
-  bugs: json.bugs,
-  homepage: json.homepage,
-  tags: json.tags,
-  keywords: json.keywords
-}))
-
-const dtslintJson = moveJson(
-  path.join("src", "dtslint.json"),
-  path.join("dist", "dtslint.json"),
-  identity
-)
-
-const program = packageJson.pipe(Effect.flatMap(() => dtslintJson))
-
-Effect.runPromise(program)
+Effect.runPromise(program).catch(console.error)

@@ -39,7 +39,6 @@ Finally, update your project's `package.json` file with the following scripts:
 {
   "scripts": {
     "dtslint": "dtslint",
-    "dtslint-installAll": "dtslint --installAll",
     "dtslint-clean": "dtslint --clean"
   }
 }
@@ -49,5 +48,4 @@ These scripts allow you to run `dtslint` and perform necessary linting checks on
 
 Flags:
 
-- `--installAll`: Installs all necessary dependencies, including those labeled as `next` and `rc`.
 - `--clean`: Clears all installations, ensuring a clean slate for subsequent operations.
