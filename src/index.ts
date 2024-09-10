@@ -11,10 +11,12 @@ import type { Options as ExpectOptions } from "./expectRule"
 namespace TypeScriptVersion {
   /** Add to this list when a version actually ships.  */
   export const shipped = [
-    "5.4"
+    "5.4",
+    "5.5",
+    "5.6"
   ] as const
   /** Add to this list when a version is available as typescript@next */
-  export const supported = [...shipped, "5.5"] as const
+  export const supported = [...shipped, "5.7"] as const
 
   export const latest = supported[supported.length - 1]
 }
@@ -40,7 +42,11 @@ async function main(): Promise<void> {
       case "--installAll":
         console.log("Cleaning old installs and installing for all TypeScript versions...")
         await cleanTypeScriptInstalls()
-        await installAllTypeScriptVersions()
+        await installTypeScriptVersions("all")
+        return
+      case "--clean":
+        console.log("Cleaning old installs...")
+        await cleanTypeScriptInstalls()
         return
       default: {
         if (arg.startsWith("--")) {
@@ -54,7 +60,7 @@ async function main(): Promise<void> {
     }
   }
 
-  await installAllTypeScriptVersions()
+  await installTypeScriptVersions("shipped")
   const err = lint(dirPath, TypeScriptVersion.supported)
   if (err) {
     throw new Error(err)
@@ -190,17 +196,17 @@ async function execAndThrowErrors(cmd: string, cwd?: string): Promise<void> {
   })
 }
 
-async function installAllTypeScriptVersions() {
-  for (const v of TypeScriptVersion.shipped) {
-    await install(v)
+async function installTypeScriptVersions(mode: "all" | "shipped") {
+  for (const version of TypeScriptVersion.shipped) {
+    await install(version)
   }
-  // `shipped + [rc, next] == supported` during the RC period. During that time, typescript@rc needs to be installed too.
-  if (TypeScriptVersion.shipped.length + 2 === TypeScriptVersion.supported.length) {
-    await install("rc")
+  if (mode === "all") {
+    // `shipped + [rc, next] == supported` during the RC period. During that time, typescript@rc needs to be installed too.
+    if (TypeScriptVersion.supported.length === TypeScriptVersion.shipped.length + 2) {
+      await install("rc")
+    }
+    if (TypeScriptVersion.supported.length >= TypeScriptVersion.shipped.length + 1) {
+      await install("next")
+    }
   }
-  await installTypeScriptNext()
-}
-
-export async function installTypeScriptNext() {
-  await install("next")
 }
