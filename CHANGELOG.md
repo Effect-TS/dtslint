@@ -1,5 +1,12 @@
 # @effect/dtslint
 
+## 0.1.1
+
+### Patch Changes
+
+- 5ad0a5f: Modernize repository publication infrastructure
+- a511628: add typescript 5.6
+
 ## 0.1.0
 
 ### Minor Changes
