@@ -39,9 +39,15 @@ Finally, update your project's `package.json` file with the following scripts:
 {
   "scripts": {
     "dtslint": "dtslint",
-    "dtslint-clean": "dtslint --installAll"
+    "dtslint-installAll": "dtslint --installAll",
+    "dtslint-clean": "dtslint --clean"
   }
 }
 ```
 
-These scripts allow you to run `dtslint` and perform necessary linting checks on your TypeScript declaration files. Additionally, the `dtslint-clean` script is used to ensure that all required TypeScript versions are properly installed.
+These scripts allow you to run `dtslint` and perform necessary linting checks on your TypeScript declaration files.
+
+Flags:
+
+- `--installAll`: Installs all necessary dependencies, including those labeled as `next` and `rc`.
+- `--clean`: Clears all installations, ensuring a clean slate for subsequent operations.
