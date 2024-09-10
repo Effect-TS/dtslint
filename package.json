@@ -1,7 +1,7 @@
 {
   "name": "@effect/dtslint",
   "version": "0.1.0",
-  "packageManager": "pnpm@9.10.0",
+  "packageManager": "pnpm@9.0.4",
   "license": "MIT",
   "author": "Giulio Canti <giulio.canti@gmail.com>",
   "description": "Effect's custom fork of dtslint used to lint TypeScript declaration (.d.ts) files",
