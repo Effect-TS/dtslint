@@ -1,5 +1,11 @@
 # @effect/dtslint
 
+## 0.1.2
+
+### Patch Changes
+
+- 7c19602: add typescript 5.7
+
 ## 0.1.1
 
 ### Patch Changes
