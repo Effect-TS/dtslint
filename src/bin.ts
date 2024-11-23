@@ -13,7 +13,8 @@ namespace TypeScriptVersion {
   export const shipped = [
     "5.4",
     "5.5",
-    "5.6"
+    "5.6",
+    "5.7"
   ] as const
 }
 
